@@ -138,7 +138,8 @@ class EntityField(AdaptableTypeField):
         super(EntityField, self).__init__(*args, **kwargs)        
 
     def flatten(self, value):
-        return value.flatten()
+        if value:
+            return value.flatten()
 
 class IdField(Field):
     pass    
