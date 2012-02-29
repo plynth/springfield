@@ -1,6 +1,6 @@
 import json
 import inspect
-from springfield.fields import Field
+from springfield.fields import Field, Empty
 
 class EntityMetaClass(type):
     def __new__(mcs, name, bases, attrs):
@@ -137,7 +137,11 @@ class FlexEntity(Entity):
         """
         Have to guess at how to flatten non-fielded values
         """
-        if isinstance(val, Entity):
+        if val is None:
+            return None
+        elif val is Empty:
+            return None
+        elif isinstance(val, Entity):
             val = val.flatten()
         elif isinstance(val, (tuple, list)) or inspect.isgenerator(val):
             vals = []

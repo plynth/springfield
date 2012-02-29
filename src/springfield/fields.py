@@ -138,7 +138,7 @@ class EntityField(AdaptableTypeField):
         super(EntityField, self).__init__(*args, **kwargs)        
 
     def flatten(self, value):
-        if value:
+        if value is not None:
             return value.flatten()
 
 class IdField(Field):
@@ -150,14 +150,16 @@ class CollectionField(Field):
         super(CollectionField, self).__init__(*args, **kwargs)
 
     def adapt(self, obj):
-        values = []
-        for item in obj:
-            values.append(self.field.adapt(item))
-        return values
+        if obj is not None:
+            values = []
+            for item in obj:
+                values.append(self.field.adapt(item))
+            return values
 
     def flatten(self, value):
-        values = []
-        for item in value:
-            values.append(self.field.flatten(item))
+        if value is not None:
+            values = []
+            for item in value:
+                values.append(self.field.flatten(item))
 
-        return values
+            return values
