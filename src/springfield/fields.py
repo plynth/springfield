@@ -105,6 +105,26 @@ class IntField(AdaptableTypeField):
 
             raise
 
+class BooleanField(AdaptableTypeField):
+    type = bool
+    def adapt(self, obj):
+        try:
+            return super(BooleanField, self).adapt(obj)
+        except TypeError:
+            if isinstance(obj, basestring):
+                str = obj.lower()
+                if str in ['yes', 'true', '1', 'on']:
+                    return True
+                elif str in ['no', 'false', '0', 'off']:
+                    return False
+            elif isinstance(obj, (float, long, int)):
+                if obj == 1:
+                    return True
+                elif obj == 0:
+                    return False
+
+            raise
+
 class StringField(AdaptableTypeField):
     type = unicode
     def adapt(self, obj):
@@ -142,7 +162,7 @@ class EntityField(AdaptableTypeField):
             return value.flatten()
 
 class IdField(Field):
-    pass    
+    pass
 
 class CollectionField(Field):
     def __init__(self, field, *args, **kwargs):
