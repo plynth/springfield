@@ -1,6 +1,9 @@
 import json
 import inspect
-from springfield.fields import Field, Empty
+from springfield.fields import Field, Empty, get_field_for_type
+from springfield import fields
+from anticipate.adapt import adapt, register_adapter, AdaptError
+from anticipate import adapter
 
 class EntityMetaClass(type):
     def __new__(mcs, name, bases, attrs):
@@ -20,6 +23,10 @@ class EntityMetaClass(type):
         attrs['__fields__'] = fields
 
         new_class = super(EntityMetaClass, mcs).__new__(mcs, name, bases, attrs)
+
+        for key, field in fields.items():
+            field.init(new_class)
+
         return new_class
 
 class Entity(object):
@@ -40,19 +47,48 @@ class Entity(object):
     def flatten(self):
         """
         Get the values as basic Python types
-        """ 
-        data = {}       
+        """
+        data = {}
         for key, val in self.__values__.iteritems():
             val = self.__fields__[key].flatten(val)
             data[key] = val
 
-        return data        
+        return data
+
+    def jsonify(self):
+        """
+        Return a dictionary suitable for JSON encoding.
+        """
+        data = {}
+        for key, val in self.__values__.iteritems():
+            val = self.__fields__[key].jsonify(val)
+            data[key] = val
+        return data
+
+    def to_json(self):
+        """
+        Convert the entity to a JSON string.
+        """
+        return json.dumps(self.jsonify())
+
+    @classmethod
+    def from_json(cls, data):
+        return cls(**json.loads(data))
 
     def set(self, key, value):
         self.__setattr__(key, value)
 
     def get(self, key, default=None):
-        return getattr(self, key, default)
+        """
+        Get a value by key. If passed an iterable, get a dictionary of values matching keys.
+        """
+        if isinstance(key, basestring):
+            return getattr(self, key, default)
+        else:
+            d = {}
+            for k in key:
+                d[k] = getattr(self, k, default)
+            return d
 
     def update(self, values):
         """
@@ -60,7 +96,7 @@ class Entity(object):
         """
         for key, val in values.iteritems():
             if key in self.__fields__:
-                self.set(key, val)            
+                self.set(key, val)
 
     def __setattr__(self, name, value):
         """
@@ -73,42 +109,24 @@ class Entity(object):
 
     @classmethod
     def adapt(cls, obj):
-        if obj is None:
-            return obj
-        elif isinstance(obj, cls):
-            return obj
-
-        e = cls()
-        if isinstance(e, obj.__class__):
-            # obj is an instance of the parent class, copy all attibutes you can
-            object.__setattr__(e, '__values__', obj.__values__)
-        elif isinstance(obj, dict):
-            e.update(obj)
-        elif hasattr(obj, '_fields'):
-            if obj._fields:
-                d = {}
-                for attr_name, field in obj._fields.items():
-                    d[attr_name] = getattr(obj, attr_name)
-                e.update(d)
-        elif '_data' in obj.__dict__:
-            e.update(obj.__dict__['_data'])
-        else:
-            e.update(obj.__dict__)
-
-        return e
+        return adapt(obj, cls)
 
     @classmethod
     def adapt_all(cls, obj):
         return (cls.adapt(i) for i in obj)
 
-    @classmethod
-    def __adapt__(cls, obj):
-        return cls.adapt(obj)
-
     def __repr__(self):
-        return '<%s %s>' % (self.__class__.__name__, json.dumps(dict(((k, str(v)) for k, v in self.__values__.iteritems()))).replace('"', ''))
+        return u'<%s %s>' % (self.__class__.__name__, json.dumps(dict(((k, unicode(v)) for k, v in self.__values__.iteritems()))).replace('"', ''))
 
-class FlexEntity(Entity):     
+    def __getstate__(self):
+        """Pickle state"""
+        return self.__values__
+
+    def __setstate__(self, data):
+        """Restore Pickle state"""
+        self.__values__ = data
+
+class FlexEntity(Entity):
     """
     An Entity that can have extra attributes added to it.
     """
@@ -121,7 +139,7 @@ class FlexEntity(Entity):
     def __setattr__(self, name, value):
         if name in self.__fields__:
             object.__setattr__(self, name, value)
-        else:        
+        else:
             self.__values__[name] = value
             self.__flex_fields__.add(name)
             self.__changes__.add(name)
@@ -131,8 +149,8 @@ class FlexEntity(Entity):
 
     def update(self, values):
         for key, val in values.iteritems():
-            self.set(key, val)       
-            
+            self.set(key, val)
+
     def _flatten_value(self, val):
         """
         Have to guess at how to flatten non-fielded values
@@ -157,11 +175,36 @@ class FlexEntity(Entity):
             val = str(val)
         return val
 
+
+    def _jsonify_value(self, val):
+        if val is None:
+            val = None
+        elif val is Empty:
+            val = None
+        elif isinstance(val, Entity):
+            val = val.jsonify()
+        elif isinstance(val, dict):
+            data = {}
+            for k,v in val.iteritems():
+                data[k] = self._jsonify_value(v)
+            val = data
+        elif isinstance(val, (tuple, list)) or inspect.isgenerator(val):
+            vals = []
+            for v in val:
+                vals.append(self._jsonify_value(v))
+            val = vals
+        else:
+            field = fields.get_field_for_type(val)
+            if field:
+                val = field.jsonify(val)
+
+        return val
+
     def flatten(self):
         """
         Get the values as basic Python types
-        """ 
-        data = {}       
+        """
+        data = {}
         for key, val in self.__values__.iteritems():
             if key in self.__fields__:
                 val = self.__fields__[key].flatten(val)
@@ -170,4 +213,34 @@ class FlexEntity(Entity):
 
             data[key] = val
 
-        return data                       
+        return data
+
+    def jsonify(self):
+        """
+        Get the values as basic Python types
+        """
+        data = {}
+        for key, val in self.__values__.iteritems():
+            if key in self.__fields__:
+                val = self.__fields__[key].jsonify(val)
+            else:
+                val = self._jsonify_value(val)
+
+            data[key] = val
+
+        return data
+
+@adapter((Entity, dict), Entity)
+def to_entity(obj, to_cls):
+    e = to_cls()
+    if isinstance(obj, Entity):
+        # obj is an Entity
+        e.update(obj.flatten())
+        return e
+    elif isinstance(obj, dict):
+        e.update(obj)
+        return e
+
+    raise AdaptError('to_entity could not adapt.')
+
+
