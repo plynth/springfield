@@ -1,4 +1,13 @@
 from datetime import datetime
+from anticipate.adapt import adapt, register_adapter, AdaptError
+
+try:
+    from dateutil.parser import parse as date_parse
+except ImportError:
+    import re
+    def date_parse(s):
+        """Assumes RFC3339 format"""
+        return datetime(*map(int, re.split(r'[^\d]', s)[:-1]))
 
 Empty = object()
 
@@ -20,13 +29,17 @@ class FieldDescriptor(object):
                 value = self.field.adapt(value())
             if value is Empty:
                 value = None
-        return value    
+        return value
 
     def __set__(self, instance, value):
-        instance.__values__[self.name] = self.field.adapt(value)
+        if value is Empty:
+            if self.name in instance.__values__:
+                del instance.__values__[self.name]
+        else:
+            instance.__values__[self.name] = self.field.adapt(value)
         instance.__changes__.add(self.name)
 
-class Field(object):    
+class Field(object):
     def __init__(self, default=Empty, *args, **kwargs):
         if callable(default):
             self.default = default
@@ -34,6 +47,11 @@ class Field(object):
             self.default = self.adapt(default)
         else:
             self.default = default
+
+    def init(self, cls):
+        """
+        Intialize the field for its owner class
+        """
 
     def adapt(self, obj):
         """
@@ -47,7 +65,13 @@ class Field(object):
     def flatten(self, value):
         """
         Get the value as a basic Python type
-        """         
+        """
+        return value
+
+    def jsonify(self, value):
+        """
+        Get the value as a suitable JSON type
+        """
         return value
 
 
@@ -62,7 +86,7 @@ class AdaptableTypeField(Field):
             return Empty
 
         if isinstance(obj, self.type):
-            return obj    
+            return obj
         elif hasattr(obj, '__adapt__'):
             try:
                 return obj.__adapt__(self.type)
@@ -74,7 +98,12 @@ class AdaptableTypeField(Field):
 
         if self.__class__.__adapters__ and type(obj) in self.__class__.__adapters__:
             return self.__class__.__adapters__[type(obj)](obj)
-                    
+
+        try:
+            return adapt(obj, self.type)
+        except AdaptError:
+            pass
+
         raise TypeError('Could not adapt %r to %r' % (obj, self.type))
 
 
@@ -102,6 +131,19 @@ class IntField(AdaptableTypeField):
                 t = int(obj)
                 if t == obj:
                     return t
+
+            raise
+
+class FloatField(AdaptableTypeField):
+    type = float
+    def adapt(self, obj):
+        try:
+            return super(FloatField, self).adapt(obj)
+        except TypeError:
+            if isinstance(obj, basestring):
+                return float(obj)
+            elif isinstance(obj, (float, long)):
+                return obj
 
             raise
 
@@ -144,30 +186,65 @@ class DateTimeField(AdaptableTypeField):
     """
     type = datetime
 
+    def adapt(self, obj):
+        try:
+            return super(DateTimeField, self).adapt(obj)
+        except TypeError:
+            if isinstance(obj, basestring):
+                return date_parse(obj)
+            raise
+
+    def jsonify(self, value):
+        """
+        Get the value as a suitable JSON type
+        """
+        if value is not None:
+            return value.isoformat()
+
 class EmailField(StringField):
     """
     Field that validates as an email address.
     """
-    
+
 class UrlField(StringField):
-    pass     
+    pass
 
 class EntityField(AdaptableTypeField):
     def __init__(self, entity, *args, **kwargs):
+        """
+        :param entity: The entity class to expect for this field. Use `self` to use the class that
+                       this field is bound to.
+        """
         self.type = entity
-        super(EntityField, self).__init__(*args, **kwargs)        
+        super(EntityField, self).__init__(*args, **kwargs)
+
+    def init(self, cls):
+        if self.type == 'self':
+            self.type = cls
 
     def flatten(self, value):
         if value is not None:
             return value.flatten()
+
+    def jsonify(self, value):
+        """
+        Get the value as a suitable JSON type
+        """
+        if value is not None:
+            return value.jsonify()
 
 class IdField(Field):
     pass
 
 class CollectionField(Field):
     def __init__(self, field, *args, **kwargs):
+        if not isinstance(field, Field):
+            field = field()
         self.field = field
         super(CollectionField, self).__init__(*args, **kwargs)
+
+    def init(self, cls):
+        self.field.init(cls)
 
     def adapt(self, obj):
         if obj is not None:
@@ -183,3 +260,33 @@ class CollectionField(Field):
                 values.append(self.field.flatten(item))
 
             return values
+
+    def jsonify(self, value):
+        """
+        Get the value as a suitable JSON type
+        """
+        if value is not None:
+            values = []
+            for item in value:
+                values.append(self.field.jsonify(item))
+
+            return values
+
+_type_map = {
+    datetime: DateTimeField(),
+    int: IntField(),
+    basestring: StringField(),
+    unicode: StringField(),
+    str: StringField(),
+    float: FloatField(),
+    bool: BooleanField(),
+}
+
+def get_field_for_type(obj):
+    t = type(obj)
+    if t in _type_map:
+        return _type_map[t]
+    for typ, field in _type_map.items():
+        if isinstance(obj, typ):
+            return field
+    return None
