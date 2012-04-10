@@ -32,7 +32,11 @@ class FieldDescriptor(object):
         return value
 
     def __set__(self, instance, value):
-        instance.__values__[self.name] = self.field.adapt(value)
+        if value is Empty:
+            if self.name in instance.__values__:
+                del instance.__values__[self.name]
+        else:
+            instance.__values__[self.name] = self.field.adapt(value)
         instance.__changes__.add(self.name)
 
 class Field(object):
@@ -234,8 +238,13 @@ class IdField(Field):
 
 class CollectionField(Field):
     def __init__(self, field, *args, **kwargs):
+        if not isinstance(field, Field):
+            field = field()
         self.field = field
         super(CollectionField, self).__init__(*args, **kwargs)
+
+    def init(self, cls):
+        self.field.init(cls)
 
     def adapt(self, obj):
         if obj is not None:
@@ -277,7 +286,7 @@ def get_field_for_type(obj):
     t = type(obj)
     if t in _type_map:
         return _type_map[t]
-    for type, field in _type_map.items():
-        if isinstance(obj, type):
+    for typ, field in _type_map.items():
+        if isinstance(obj, typ):
             return field
     return None

@@ -78,25 +78,37 @@ class Entity(object):
     def set(self, key, value):
         self.__setattr__(key, value)
 
-    def get(self, key, default=None):
+    def get(self, key, default=None, empty=False):
         """
         Get a value by key. If passed an iterable, get a dictionary of values matching keys.
+
+        :param empty: boolean - Include empty values
         """
         if isinstance(key, basestring):
             return getattr(self, key, default)
         else:
             d = {}
             for k in key:
-                d[k] = getattr(self, k, default)
+                if empty:
+                    d[k] = getattr(self, k, default)
+                else:
+                    v = self.__values__.get(k, Empty)
+                    if v is not Empty:
+                        d[k] = v
             return d
 
     def update(self, values):
         """
         Update attibutes. Ignore keys that aren't fields.
         """
-        for key, val in values.iteritems():
-            if key in self.__fields__:
-                self.set(key, val)
+        if hasattr(values, '__values__'):
+            for key, val in values.__values__.items():
+                if key in self.__fields__:
+                    self.set(key, val)
+        else:
+            for key, val in values.items():
+                if key in self.__fields__:
+                    self.set(key, val)
 
     def __setattr__(self, name, value):
         """
@@ -113,7 +125,7 @@ class Entity(object):
 
     @classmethod
     def adapt_all(cls, obj):
-        return (cls.adapt(i) for i in obj)
+        return (adapt(i, cls) for i in obj)
 
     def __repr__(self):
         return u'<%s %s>' % (self.__class__.__name__, json.dumps(dict(((k, unicode(v)) for k, v in self.__values__.iteritems()))).replace('"', ''))
