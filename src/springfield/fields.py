@@ -9,6 +9,14 @@ except ImportError:
         """Assumes RFC3339 format"""
         return datetime(*map(int, re.split(r'[^\d]', s)[:-1]))
 
+try:
+    from pyrfc3339 import generate as _generate
+    def generate_rfc3339(value):
+        return _generate(value, accept_naive=True)
+except ImportError:
+    def generate_rfc3339(value):
+        return value.isoformat('T') + 'Z'
+
 Empty = object()
 
 class FieldDescriptor(object):
@@ -199,7 +207,7 @@ class DateTimeField(AdaptableTypeField):
         Get the value as a suitable JSON type
         """
         if value is not None:
-            return value.isoformat()
+            return generate_rfc3339(value)
 
 class EmailField(StringField):
     """
