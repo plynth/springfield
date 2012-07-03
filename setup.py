@@ -13,7 +13,7 @@ def main():
         # download_url='http://github.com/six8/polydatum',
         keywords=['orm'],
         license='MIT',
-        description='A backend agnostic entity libray',
+        description='A backend agnostic entity library',
         classifiers = [
             "Programming Language :: Python",
             "Development Status :: 3 - Alpha",

@@ -1,21 +1,7 @@
 from datetime import datetime
 from anticipate.adapt import adapt, register_adapter, AdaptError
-
-try:
-    from dateutil.parser import parse as date_parse
-except ImportError:
-    import re
-    def date_parse(s):
-        """Assumes RFC3339 format"""
-        return datetime(*map(int, re.split(r'[^\d]', s)[:-1]))
-
-try:
-    from pyrfc3339 import generate as _generate
-    def generate_rfc3339(value):
-        return _generate(value, accept_naive=True)
-except ImportError:
-    def generate_rfc3339(value):
-        return value.isoformat('T') + 'Z'
+from springfield.timeutil import date_parse, generate_rfc3339
+import re
 
 Empty = object()
 
@@ -186,7 +172,16 @@ class StringField(AdaptableTypeField):
             raise
 
 class SlugField(StringField):
-    pass
+    """
+    Field whos value is a slugified string
+    """
+    def adapt(self, obj):
+        val = super(SlugField, self).adapt(obj)
+
+        slug = re.sub(r'[^a-z0-9-]+', '-', val.lower())
+        slug = re.sub(r'-+', '-', slug).strip('-')
+
+        return slug
 
 class DateTimeField(AdaptableTypeField):
     """
