@@ -9,6 +9,7 @@ class FieldDescriptor(object):
     def __init__(self, name, field):
         self.name = name
         self.field = field
+        self.__doc__ = self.field.__doc__
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -34,13 +35,19 @@ class FieldDescriptor(object):
         instance.__changes__.add(self.name)
 
 class Field(object):
-    def __init__(self, default=Empty, *args, **kwargs):
+    def __init__(self, default=Empty, doc=None, *args, **kwargs):
+        """
+        :param default: The default value if no value is assigned to this field
+        :param doc: The docstring to assign to this field and its descriptor
+        """
         if callable(default):
             self.default = default
         elif default is not None and default is not Empty:
             self.default = self.adapt(default)
         else:
             self.default = default
+
+        self.__doc__ = doc
 
     def init(self, cls):
         """

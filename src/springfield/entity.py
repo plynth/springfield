@@ -119,6 +119,45 @@ class Entity(object):
         else:
             raise AttributeError('Field %r not defined.' % name)
 
+    # Dict interface
+    def __getitem__(self, name):
+        try:
+            return getattr(self, name)
+        except AttributeError:
+            pass
+        raise KeyError(name)
+
+    def __setitem__(self, name, value):
+        try:
+            return setattr(self, name, value)
+        except AttributeError:
+            pass
+        raise KeyError(name)
+
+    def __delitem__(self, name):
+        if name in self.__fields__:
+            del self.__values__[name]
+        else:
+            raise KeyError('Field %r not defined.' % name)
+
+    def __contains__(self, name):
+        return name in self.__values__
+
+    def __len__(self):
+        return len(self.__values__)
+
+    def iteritems(self):
+        return self.__values__.iteritems()
+
+    def items(self):
+        return self.__values__.items()
+
+    def clear(self):
+        return self.__values__.clear()
+
+    def __iter__(self):
+        return iter(self.__values__)
+
     @classmethod
     def adapt(cls, obj):
         return adapt(obj, cls)
