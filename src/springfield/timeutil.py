@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from datetime import timedelta, tzinfo, datetime
 import re
 
@@ -27,32 +29,42 @@ except ImportError:
         def __str__(self):
             return self._name
 
+        def __repr__(self):
+            return self._name
+
+    #: A :class:`tzinfo` for UTC
     utc = _UtcOffset()
 
 try:
     from dateutil.parser import parse as date_parse
 except ImportError:
     import re
-    def date_parse(s):
+    def date_parse(date):
         """
-        Parse an RFC3339 formated time string into a datetime object.
+        Parse an RFC3339 formatted time string into a datetime object.
 
         Assumes input is UTC.
         """
-        return datetime(*map(int, re.split(r'[^\d]', s)[:-1])).replace(tzinfo=utc)
+        return datetime(*map(int, re.split(r'[^\d]', date)[:-1])).replace(tzinfo=utc)
 
 try:
     from pyrfc3339 import generate as _generate
     def generate_rfc3339(value):
         """
-        Converts a datatime to an RFC3339 formated time string
+        Converts a datetime to an RFC3339 formatted time string
+
+        :param value: A :class:`datetime` instance
         """
         return _generate(value, accept_naive=True)
+
 except ImportError:
     def generate_rfc3339(value):
         """
-        Converts a datatime to an RFC3339 formated time string.
-        Input is always converted to UTC.                
+        Converts a datetime to an RFC3339 formatted time string.
+
+        Input is always converted to UTC.
+
+        :param value: A :class:`datetime` instance
         """        
         if value.tzinfo is None:
             value = value.replace(tzinfo=utc)
@@ -64,6 +76,8 @@ except ImportError:
 def utcnow():
     """
     Returns the current time in TZ aware UTC.
+
+    :returns: :class:`datetime` instance
     """
     return datetime.now(utc)
 
