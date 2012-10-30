@@ -8,7 +8,7 @@ def test_slug():
 
     for input, expect in [
         ('01 HDR test', '01-hdr-test'),
-        ('&*$#(8$jjsdsd77-----', '8-jjsdsd77'),
+        ('--&*$#(8$jjsdsd77-----test phrase12 123--', '8jjsdsd77-test-phrase12-123'),
         ('1234', '1234'),
         ('abcdEFG', 'abcdefg'),
     ]:

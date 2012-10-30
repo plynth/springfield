@@ -296,7 +296,7 @@ class SlugField(StringField):
 
         slug = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore')
         slug = re.sub(r'[^\w\s-]', '', slug).strip().lower()
-        slug = re.sub(r'[-\s]+', '-', slug)
+        slug = re.sub(r'[-\s]+', '-', slug).strip('-')
 
         return slug
 
