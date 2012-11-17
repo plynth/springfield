@@ -2,13 +2,17 @@
 SpringField
 ===========
 
-SpringField makes it easy to model structured data.
+SpringField makes API data easy.
 
-It provides three abstractions:
+SpringField makes it simple to model structured data. Once the data is modeled,
+SpringField can parse API responses into easy to use Python objects and types. It
+can also generate the same structured data for making API request.
 
-1. Fields - A data type property
-2. Entity - A container of fields
-3. Persona - A different representation of an Entity which handles validation
+SpringField is ideal for:
+
+- Restful JSON API data structures
+- Parsing CSV data structures from ``csv.DictReader``
+- Turning anything Python can parse into a ``dict`` or ``list`` into a structured object
 
 Similar Projects
 ----------------

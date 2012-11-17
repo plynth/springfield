@@ -1,39 +1,84 @@
 import json
 import inspect
 from springfield.fields import Field, Empty, get_field_for_type
+from springfield.alias import Alias
 from springfield import fields
 from anticipate.adapt import adapt, register_adapter, AdaptError
 from anticipate import adapter
 
+class EntityBase(object):
+    """
+    An empty class that does nothing but allow us to determine
+    if an Entity references other Entities in the EntityMetaClass.
+
+    We can't do this with Entity directly since Entity can't exist
+    until EntityMetaClass is created but EntityMetaClass can't compare
+    against Entity since it doesn't exist yet.
+    """
+
 class EntityMetaClass(type):
     def __new__(mcs, name, bases, attrs):
-        fields = {}
+        _fields = {}
+        aliases = {}
         for base in bases:
             if hasattr(base, '__fields__'):
-                fields.update(base.__fields__)
+                _fields.update(base.__fields__)
+            if hasattr(base, '__aliases__'):
+                _fields.update(base.__aliases__)
 
         for key, val in attrs.items():
-            if isinstance(val, Field):
-                fields[key] = val
-                attrs.pop(key)
+            is_cls = inspect.isclass(val)
 
-        for key, field in fields.iteritems():
+            if isinstance(val, Field):
+                _fields[key] = val
+                attrs.pop(key)
+            elif isinstance(val, Alias):
+                aliases[key] = val
+                attrs.pop(key)
+            elif is_cls and issubclass(val, Field):
+                _fields[key] = val()
+                attrs.pop(key)                
+            elif isinstance(val, EntityBase) or (is_cls and issubclass(val, EntityBase)):
+                # Wrap fields assigned to `Entity`s with an `EntityField`
+                _fields[key] = fields.EntityField(val)
+                attrs.pop(key)
+            elif isinstance(val, list) and len(val) == 1:      
+                attr = val[0]       
+                is_cls = inspect.isclass(attr)
+                if isinstance(attr, EntityBase) or (is_cls and issubclass(attr, EntityBase)):
+                    # Lists that contain just an Entity class are treated as
+                    # a collection of that Entity
+                    _fields[key] = fields.CollectionField(fields.EntityField(attr))
+                elif isinstance(attr, Field) or (is_cls and issubclass(attr, Field)):
+                    # Lists that contain just a Field class are treated as
+                    # a collection of that Field
+                    _fields[key] = fields.CollectionField(attr)
+
+        for key, field in _fields.iteritems():
             attrs[key] = field.make_descriptor(key)
 
-        attrs['__fields__'] = fields
+        for key, field in aliases.iteritems():
+            attrs[key] = field.make_descriptor(key)
+
+        attrs['__fields__'] = _fields
+        attrs['__aliases__'] = aliases
 
         new_class = super(EntityMetaClass, mcs).__new__(mcs, name, bases, attrs)
 
-        for key, field in fields.items():
+        for key, field in _fields.items():
+            field.init(new_class)
+
+        for key, field in aliases.items():
             field.init(new_class)
 
         return new_class
 
-class Entity(object):
+class Entity(EntityBase):
     __metaclass__ = EntityMetaClass
     __values__ = None
     __changes__ = None
     __fields__ = None
+    __aliases__ = None
 
     def __init__(self, **values):
         # Where the actual values are stored
@@ -100,15 +145,53 @@ class Entity(object):
     def update(self, values):
         """
         Update attibutes. Ignore keys that aren't fields.
+        Allows dot notation.
         """
         if hasattr(values, '__values__'):
             for key, val in values.__values__.items():
-                if key in self.__fields__:
-                    self.set(key, val)
+                try:
+                    self[key] = val
+                except KeyError:
+                    pass
         else:
             for key, val in values.items():
-                if key in self.__fields__:
-                    self.set(key, val)
+                try:
+                    self[key] = val
+                except KeyError:
+                    pass
+
+    def _get_field_path(self, entity, target, path=None):
+        """
+        Use dot notation to get a field and all it's
+        ancestory fields.
+        """
+        path = path or []
+        if '.' in target:            
+            name, right = target.split('.', 1)
+            soak = False
+            if name.endswith('?'):
+                # Targets like 'child?.key' use "soak" to allow `child` to be empty
+                name = name[:-1]
+                soak = True
+
+            field = entity.__fields__[name]
+            key = '.'.join([f[0] for f in path] + [name])
+
+            if isinstance(field, fields.EntityField):
+                path.append((key, name, field, soak))
+                return self._get_field_path(field.type, right, path)
+            else:            
+                raise KeyError('Expected EntityField for %s' % key)
+        else:
+            soak = False
+            if target.endswith('?'):
+                # Targets like 'child?.key' use "soak" to allow `child` to be empty
+                target = target[:-1]
+                soak = True
+
+            key = '.'.join([f[0] for f in path] + [target])
+            path.append((key, target, entity.__fields__[target], soak))
+            return path
 
     def __setattr__(self, name, value):
         """
@@ -122,13 +205,50 @@ class Entity(object):
     # Dict interface
     def __getitem__(self, name):
         try:
+            if '.' in name:
+                pos = self        
+                path = self._get_field_path(self, name)
+                last = path[-1]
+                path = path[:-1]
+                for field_key, field_name, field, soak in path:
+                    if isinstance(field, fields.EntityField):
+                        if not getattr(pos, field_name):
+                            if soak:
+                                return Empty
+                            else:
+                                raise ValueError('%s is empty' % field_key)
+                        pos = getattr(pos, field_name)
+                    else:
+                        raise ValueError('Expected Entity for %s' % field_key)
+
+                # This should be the end of our path, just get it
+                return getattr(pos, last[1])
+
             return getattr(self, name)
         except AttributeError:
             pass
         raise KeyError(name)
 
     def __setitem__(self, name, value):
-        try:
+        try:    
+            if '.' in name:
+                pos = self        
+                path = self._get_field_path(self, name)
+                last = path[-1]
+                path = path[:-1]
+
+                for field_key, field_name, field, soak in path:
+                    if isinstance(field, fields.EntityField):
+                        if not getattr(pos, field_name):
+                            # Create a new Entity instance
+                            setattr(pos, field_name, field.type())
+                        pos = getattr(pos, field_name)
+                    else:
+                        raise ValueError('Expected Entity for %s' % field_key)
+                        
+                # This should be the end of our path, just set it
+                return setattr(pos, last[1], value)
+
             return setattr(self, name, value)
         except AttributeError:
             pass
@@ -175,7 +295,12 @@ class Entity(object):
 
     def __setstate__(self, data):
         """Restore Pickle state"""
-        self.__values__ = data
+        object.__setattr__(self, '__values__', data)
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.__values__ == other.__values__
+        raise NotImplementedError
 
 class FlexEntity(Entity):
     """

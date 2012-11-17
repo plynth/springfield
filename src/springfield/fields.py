@@ -27,28 +27,17 @@ class FieldDescriptor(object):
         if instance is None:
             return self
 
-        # Get value from document instance if available, if not use default
-        value = instance.__values__.get(self.name)
-        if value is Empty:
-            value = self.field.default
-            # Allow callable default values
-            if callable(value):
-                value = self.field.adapt(value())
-            if value is Empty:
-                value = None
-        return value
+        return self.field.get(instance, self.name)
 
     def __set__(self, instance, value):
         """
         Set a value for this :class:`Field`. The value
         is adapted to the :class:`Field`'s type if needed.
         """
-        if value is Empty:
-            if self.name in instance.__values__:
-                del instance.__values__[self.name]
-        else:
-            instance.__values__[self.name] = self.field.adapt(value)
-        instance.__changes__.add(self.name)
+        old_value = instance.__values__.get(self.name)
+        new_value = self.field.set(instance, self.name, value)
+        if new_value != old_value:
+            instance.__changes__.add(self.name)
 
 class Field(object):
     """
@@ -75,6 +64,26 @@ class Field(object):
 
         :param cls: An :class:`Entity` class.
         """
+
+    def get(self, instance, name):
+        # Get value from document instance if available, if not use default
+        value = instance.__values__.get(name)
+        if value is Empty:
+            value = self.default
+            # Allow callable default values
+            if callable(value):
+                value = self.adapt(value())
+            if value is Empty:
+                value = None
+        return value
+
+    def set(self, instance, name, value):
+        if value is Empty:
+            if name in instance.__values__:
+                del instance.__values__[name]
+        else:
+            instance.__values__[name] = self.adapt(value)
+        return instance.__values__[name]
 
     def adapt(self, value):
         """
@@ -106,7 +115,6 @@ class Field(object):
         :param value: An :class:`Entity`'s value for this :class:`Field`
         """
         return value
-
 
 class AdaptableTypeField(Field):
     """
@@ -296,7 +304,7 @@ class SlugField(StringField):
 
         slug = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore')
         slug = re.sub(r'[^\w\s-]', '', slug).strip().lower()
-        slug = re.sub(r'[-\s]+', '-', slug)
+        slug = re.sub(r'[-\s]+', '-', slug).strip('-')
 
         return slug
 
@@ -431,6 +439,7 @@ class CollectionField(Field):
                 values.append(self.field.jsonify(item))
 
             return values
+
 
 #: Map basic types to fields
 _type_map = {
