@@ -1,5 +1,7 @@
 include README.rst VERSION.txt LICENSE
 recursive-include src *
+recursive-include src *.pyc
+recursive-include src *.pyo
 recursive-include docs *
 recursive-exclude docs *.pyc
 recursive-exclude docs *.pyo
