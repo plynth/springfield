@@ -291,11 +291,15 @@ class Entity(EntityBase):
 
     def __getstate__(self):
         """Pickle state"""
-        return self.__values__
+        return {
+            '__values__' : self.__values__,
+            '__changes__': self.__changes__
+        }
 
     def __setstate__(self, data):
         """Restore Pickle state"""
-        object.__setattr__(self, '__values__', data)
+        object.__setattr__(self, '__values__', data['__values__'])
+        object.__setattr__(self, '__changes__', data['__changes__'])
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \

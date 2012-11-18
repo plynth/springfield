@@ -35,6 +35,10 @@ def test_pickle():
 
     assert entity == entity2
 
+    # Change attributes to make sure every un-pickled ok
+    entity2.name = 'New name'
+    assert entity2.name == 'New name'
+
 def test_eq():
     entity1 = SampleEntity(
         id=1,
