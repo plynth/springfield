@@ -34,3 +34,28 @@ def test_pickle():
     entity2 = pickle.loads(pickled)
 
     assert entity == entity2
+
+def test_eq():
+    entity1 = SampleEntity(
+        id=1,
+        name='test name'
+    )    
+
+    entity2 = SampleEntity(
+        id=1,
+        name='test name'
+    )      
+
+    entity3 = SampleEntity(
+        id=2,
+        name='test name'
+    )       
+
+    assert entity1 == entity2   
+    assert entity2 == entity1
+    assert entity1 != entity3   
+    assert entity2 != entity3
+
+    assert hash(entity1) == hash(entity1)
+    assert hash(entity1) != hash(entity2)
+    assert hash(entity1) != hash(entity3)

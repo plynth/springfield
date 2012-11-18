@@ -298,9 +298,11 @@ class Entity(EntityBase):
         object.__setattr__(self, '__values__', data)
 
     def __eq__(self, other):
-        if isinstance(other, self.__class__):
-            return self.__values__ == other.__values__
-        raise NotImplementedError
+        return isinstance(other, self.__class__) and \
+            self.__values__ == other.__values__
+
+    def __neq__(self, other):
+        return not self.__eq__(other)
 
 class FlexEntity(Entity):
     """
