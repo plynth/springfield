@@ -2,6 +2,10 @@
 SpringField
 ===========
 
+.. image:: https://secure.travis-ci.org/six8/springfield.png
+    :target: http://travis-ci.org/six8/springfield
+    :alt: Build Status
+
 SpringField makes API data easy.
 
 SpringField makes it simple to model structured data. Once the data is modeled,
