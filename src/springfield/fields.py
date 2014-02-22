@@ -3,6 +3,7 @@ import unicodedata
 from anticipate.adapt import adapt, AdaptError
 from springfield.timeutil import date_parse, generate_rfc3339
 from springfield.types import Empty
+from decimal import Decimal
 import re
 
 class FieldDescriptor(object):
@@ -223,6 +224,8 @@ class FloatField(AdaptableTypeField):
                 return float(value)
             elif isinstance(value, (float, long)):
                 return value
+            elif isinstance(value, Decimal):
+                return float(value)
 
             raise
 
