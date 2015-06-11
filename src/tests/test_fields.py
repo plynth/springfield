@@ -13,3 +13,16 @@ def test_slug():
         ('abcdEFG', 'abcdefg'),
     ]:
         assert slugify(input) == expect
+
+def test_float():
+    """
+    Assure that float can adapt various types
+    """
+    floatify = fields.FloatField().adapt
+
+    for input, expect in [
+        (1.1, 1.1),
+        (11, 11.0),
+        (long(5.7), 5L)
+    ]:
+        assert floatify(input) == expect

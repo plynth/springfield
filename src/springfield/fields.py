@@ -211,7 +211,7 @@ class FloatField(AdaptableTypeField):
         try:
             return super(FloatField, self).adapt(value)
         except TypeError:
-            if isinstance(value, basestring):
+            if isinstance(value, (basestring, int)):
                 return float(value)
             elif isinstance(value, (float, long)):
                 return value
