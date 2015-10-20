@@ -5,6 +5,7 @@ from springfield.timeutil import date_parse, generate_rfc3339
 from springfield.types import Empty
 from decimal import Decimal
 import re
+import urlparse
 
 class FieldDescriptor(object):
     """
@@ -350,6 +351,23 @@ class UrlField(StringField):
     """
     :class:`Field` with a URL value
     """
+    def adapt(self, value):
+        """
+        Validate that the `value` has a valid URL format containing
+        a scheme and network location using urlparse.
+
+        :param value: A url-like value.
+
+        :returns: URL with sheme and network location in lower case.
+        """
+        url_parts = urlparse.urlparse(value)
+        if url_parts.scheme and url_parts.netloc:
+            new_url_parts = list(url_parts)
+            new_url_parts[0] = url_parts.scheme.lower()
+            new_url_parts[1] = url_parts.netloc.lower()
+            return urlparse.urlunparse(new_url_parts)
+
+        raise TypeError('URL: %s is not a valid URL format' % value)
 
 class EntityField(AdaptableTypeField):
     """
