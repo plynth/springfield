@@ -1,4 +1,5 @@
 from springfield import fields
+import pytest
 
 def test_slug():
     """
@@ -26,3 +27,30 @@ def test_float():
         (long(5.7), 5L)
     ]:
         assert floatify(input) == expect
+
+def test_url():
+    """
+    Assure that url performs some basic validation
+    """
+    urlify = fields.UrlField().adapt
+
+    # positive tests
+    for input, expect in [
+        ('http://www.google.com/SOME/path', 'http://www.google.com/SOME/path'),
+        ('http://www.google.com/Path?foo=bar&bar=fOO', 'http://www.google.com/Path?foo=bar&bar=fOO'),
+        ('hTTp://www.Google.com', 'http://www.google.com'),
+        ('ftp://www.google.com', 'ftp://www.google.com'),
+        ('https://www.google.com', 'https://www.google.com')
+    ]:
+        assert urlify(input) == expect
+
+    # negative tests
+    for input in [
+        'http;//www.google.com',
+        'http:/www.google.com',
+        'http:www.google.com',
+        '<script></script>',
+        '<img src="http://foo.bar/badimage">'
+    ]:
+        with pytest.raises(TypeError):
+            urlify(input)
