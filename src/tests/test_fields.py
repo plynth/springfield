@@ -40,7 +40,8 @@ def test_url():
         ('http://www.google.com/Path?foo=bar&bar=fOO', 'http://www.google.com/Path?foo=bar&bar=fOO'),
         ('hTTp://www.Google.com', 'http://www.google.com'),
         ('ftp://www.google.com', 'ftp://www.google.com'),
-        ('https://www.google.com', 'https://www.google.com')
+        ('https://www.google.com', 'https://www.google.com'),
+        (None, None),
     ]:
         assert urlify(input) == expect
 

@@ -360,14 +360,16 @@ class UrlField(StringField):
 
         :returns: URL with sheme and network location in lower case.
         """
-        url_parts = urlparse.urlparse(value)
-        if url_parts.scheme and url_parts.netloc:
-            new_url_parts = list(url_parts)
-            new_url_parts[0] = url_parts.scheme.lower()
-            new_url_parts[1] = url_parts.netloc.lower()
-            return urlparse.urlunparse(new_url_parts)
+        value = super(UrlField, self).adapt(value)
+        if value:
+            url_parts = urlparse.urlparse(value)
+            if url_parts.scheme and url_parts.netloc:
+                new_url_parts = list(url_parts)
+                new_url_parts[0] = url_parts.scheme.lower()
+                new_url_parts[1] = url_parts.netloc.lower()
+                return urlparse.urlunparse(new_url_parts)
 
-        raise TypeError('URL: %s is not a valid URL format' % value)
+            raise TypeError('URL: %s is not a valid URL format' % value)
 
 class EntityField(AdaptableTypeField):
     """
