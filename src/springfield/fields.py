@@ -275,6 +275,7 @@ class StringField(AdaptableTypeField):
     """
 
     type = unicode
+
     def adapt(self, value):
         """
         Adapt `value` to `unicode`.
@@ -285,6 +286,14 @@ class StringField(AdaptableTypeField):
             if isinstance(value, basestring):
                 return unicode(value)
             raise
+
+class BytesField(AdaptableTypeField):
+    """
+    A :class:`Field` that contains binary bytes (or a legacy Python 2 string).
+    """
+
+    type = bytes
+
 
 class SlugField(StringField):
     """
