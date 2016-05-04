@@ -55,3 +55,47 @@ def test_url():
     ]:
         with pytest.raises(TypeError):
             urlify(input)
+
+
+def test_bytes():
+    """
+    Check that bytes encode/decode to/from json without problems.  And check
+    the support for the `encoding` option for BytesField.
+    """
+    escaping_bytes_field = fields.BytesField(encoding=None)
+    hex_bytes_field = fields.BytesField(encoding='hex')
+    base64_bytes_field = fields.BytesField()  # base64 is the default
+
+    # Basic check of adapt and jsonify on just bytes
+    for input in ('abc', '\x00\xA0\xFF'):
+        for f in (escaping_bytes_field, hex_bytes_field, base64_bytes_field):
+            # Adapt should reverse jsonify
+            assert f.adapt(f.jsonify(input)) == input
+            # Since its already bytes, adapt is a no-op
+            assert f.adapt(input) == input
+        assert escaping_bytes_field.jsonify(input) == input.decode('latin1')
+        assert hex_bytes_field.jsonify(input) == unicode(input.encode('hex'))
+        assert base64_bytes_field.jsonify(input) == unicode(input.encode('base64'))
+
+    # BytesField doesn't jsonify unicode values
+    for input in (u'abc', u'\u0100', u'\u0000'):
+        for f in (escaping_bytes_field, hex_bytes_field, base64_bytes_field):
+            with pytest.raises(ValueError):
+                f.jsonify(input)
+
+    # BytesField doesn't adapt unicode values with code points > 255
+    for f in (escaping_bytes_field, hex_bytes_field, base64_bytes_field):
+        with pytest.raises(ValueError):
+            f.jsonify(u'\u0100')
+
+    # Hex encoding doesn't accept non-hex inputs
+    with pytest.raises(TypeError):
+        hex_bytes_field.adapt(u'hijklmnop')
+
+    # Should leave null alone
+    for f in (escaping_bytes_field, hex_bytes_field, base64_bytes_field):
+        assert f.adapt(None) == None
+        assert f.jsonify(None) == None
+
+
+
