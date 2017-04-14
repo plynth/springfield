@@ -1,5 +1,6 @@
-from springfield import fields
+from springfield import fields, Entity
 import pytest
+
 
 def test_slug():
     """
@@ -15,6 +16,7 @@ def test_slug():
     ]:
         assert slugify(input) == expect
 
+
 def test_float():
     """
     Assure that float can adapt various types
@@ -27,6 +29,7 @@ def test_float():
         (long(5.7), 5L)
     ]:
         assert floatify(input) == expect
+
 
 def test_url():
     """
@@ -98,4 +101,105 @@ def test_bytes():
         assert f.jsonify(None) == None
 
 
+def test_dotted_named_entities():
+    """
+    Assure that EntityField can be instantiated with dotted-named
+    classes.
+    """
+    class TestEntity(Entity):
+        foo = fields.EntityField('tests.dottedname.foo.bar.baz.Zap')
 
+    e = TestEntity(foo={'name': 'baz'})
+    assert e.foo.name == 'baz'  # noqa
+
+    # Avoid importing the class before the TestEntity above is instantiated
+    # so that we know the `EntityField` import worked as expected.
+    from tests.dottedname.foo.bar.baz import Zap
+    assert isinstance(e.foo, Zap)
+
+
+def test_dotted_named_entities_circular_references():
+    """
+    Assure that circular references in entity fields are handled when
+    using dotted-name EntityField types.
+    """
+    from tests.dottedname.foo.bar.bop import Property
+
+    p = Property(
+        name='outer',
+        nested={
+            'properties': [
+                Property(name='inner')
+            ]
+        }
+    )
+    assert p
+    assert isinstance(p.nested.properties, list)
+    assert p.nested.properties[0].name == 'inner'
+
+
+def test_dotted_named_entities_not_callable():
+    """
+    Assure that if a dotted-name reference is not callable, that an
+    expected error is raised.
+    """
+    class TestEntity(Entity):
+        foo = fields.EntityField('tests.dottedname.foo.bar.baz.NotCallable')
+
+    with pytest.raises(ValueError):
+        TestEntity(foo={'name': 'baz'})
+
+
+def test_dotted_named_entities_not_importable():
+    """
+    Assure that if invalid references are used, an expected error is raised.
+    """
+    class RandomStringTestEntity(Entity):
+        foo = fields.EntityField('a.string.with.dots')
+
+    with pytest.raises(ValueError):
+        RandomStringTestEntity(foo='anything')
+
+
+def test_dotted_named_entities_not_dotted():
+    """
+    Assure that byte string references are actually dotted-name references.
+    """
+    class NonDottedNameEntity(Entity):
+        # `Property` is a real class, but this string is not a full
+        # reference, so it can't be resolved and is therefore considered
+        # invalid.
+        foo = fields.EntityField('Property')
+
+    with pytest.raises(ValueError):
+        NonDottedNameEntity(foo={})
+
+    class ExistingNonDottedNameEntity(Entity):
+        # `FlexEntity` is a real class and it's likely in the local
+        # import scope, but it's still not considered a supported
+        # dotted-name class reference.
+        foo = fields.EntityField('FlexEntity')
+
+    with pytest.raises(ValueError):
+        ExistingNonDottedNameEntity(foo={})
+
+
+    class SelfNonDottedNameEntity(Entity):
+        # 'self' is a special case and is the only non-dotted,
+        # dotted-name class reference that we support.
+        foo = fields.EntityField('self')
+        name = fields.StringField()
+
+    result = SelfNonDottedNameEntity(
+        name='outer',
+        foo={
+            'name': 'inner',
+            'foo': {
+                'name': 'deeper'
+            }
+        }
+    )
+    assert result
+    assert result.name == 'outer'
+    assert result.foo.name == 'inner'
+    assert result.foo.foo.name == 'deeper'

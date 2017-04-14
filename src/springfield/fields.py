@@ -1,5 +1,7 @@
 from datetime import datetime
 import unicodedata
+
+import sys
 from anticipate.adapt import adapt, AdaptError
 from springfield.timeutil import date_parse, generate_rfc3339
 from springfield.types import Empty
@@ -447,18 +449,82 @@ class EntityField(AdaptableTypeField):
     """
     :class:`Field` that can contain an :class:`Entity`
     """
+
+    # A map storing resolved dotted-name class types
+    _dotted_name_types = {}
+
     def __init__(self, entity, *args, **kwargs):
         """
         :param entity: The :class:`Entity` class to expect for this field.
                        Use 'self' to use the :class:`Entity` class that
                        this field is already bound to.
         """
-        self.type = entity
+        self._type = entity
         super(EntityField, self).__init__(*args, **kwargs)
 
+    @staticmethod
+    def _resolve_dotted_name(dotted_name):
+        try:
+            if '.' in dotted_name:
+                modules, _kls_name = dotted_name.rsplit('.', 1)
+                _module = __import__(modules, fromlist=[_kls_name])
+                _kls = getattr(_module, _kls_name)
+                assert callable(_kls), 'Dotted-name entity types should be callable.'
+                return _kls
+            elif 'self' != dotted_name:
+                raise ValueError('Invalid class name for EntityField: %s' % dotted_name)
+        except Exception as e:
+            raise (
+                ValueError,
+                'Invalid class name for EntityField: %s' % dotted_name,
+                sys.exc_info()[2]
+            )
+
+    @property
+    def type(self):
+        """
+        Determine the type of the Entity that will be instantiated.
+
+        There are three ways to reference an Entity when using an EntityField:
+
+        - 'self': A byte string referencing the class that is defining this
+            EntityField as an attribute.
+        - '{dotted.name.kls}': A byte string referencing an importable callable
+            that can be instantiated at field-instantiation time.
+        - {Entity}: A type that subclasses `Entity`.
+
+        The order of operations during instantiation and resolution of the
+        above references is important; During the creation of an `Entity`, the
+        metaclass will call `init()` for fields defined on the class. This
+        is useful for the 'self' reference so that the `EntityField` can
+        be initialized with the class that is being instantiated during
+        creation of the instance. For dotted-name class strings, this is too
+        early since the dotted-name reference may not exist yet. For this
+        reason, resolving the dotted-name reference is deferred to be as late
+        as possible, in this case on the first read of the `type` property of
+        this field.
+
+        The dotted-name references are stored in a map on the `EntityField`
+        class to prevent resolving and importing the dotted-name on every
+        instance of this `EntityField`.
+
+        Returns:
+            `type`: A type to use when instantiating the Entity for this
+                EntityField.
+
+        """
+
+        if isinstance(self._type, str):
+            if self._type not in self.__class__._dotted_name_types:
+                _kls = self._resolve_dotted_name(self._type)
+                self.__class__._dotted_name_types[self._type] = _kls
+            return self.__class__._dotted_name_types[self._type]
+
+        return self._type
+
     def init(self, cls):
-        if self.type == 'self':
-            self.type = cls
+        if self._type == 'self':
+            self._type = cls
 
     def flatten(self, value):
         """
