@@ -287,12 +287,75 @@ class StringField(AdaptableTypeField):
                 return unicode(value)
             raise
 
+
 class BytesField(AdaptableTypeField):
     """
-    A :class:`Field` that contains binary bytes (or a legacy Python 2 string).
+    A :class:`Field` that contains binary `bytes`.
+
+    The field has an encoding to use for json/unicode conversion, such
+    as `'base64'` (the default) or `'hex'`.
+
+    If `encoding == None`, no encoding/decoding is performed for JSON/unicode
+    values which mean JSON itself will have to escape the bytes using unicode
+    escapes where necessary.  This is most suitable for cases where the "bytes"
+    are known to be ASCII 7-bit safe.
+
+    The encoding is used in `adapt` if the input is a `unicode` instance, and
+    in `jsonify` always.
     """
 
     type = bytes
+    encoding = 'base64'
+
+    def __init__(self, encoding='base64', *args, **kwargs):
+        """
+        Construct a Bytes field
+
+        :param encoding: Optional encoding to use for jsonify(), such as
+           'hex' or 'base64'
+        """
+        super(BytesField, self).__init__(*args, **kwargs)
+        self.encoding = encoding
+
+    def jsonify(self, value):
+        """
+        Encode the bytes into a unicode string suitable for json encoding.
+
+        If an encoding was specified for the field, it is applied here.
+        """
+        if value is None:
+            return None
+
+        if not isinstance(value, bytes):
+            raise ValueError('BytesField must contain bytes')
+
+        # Apply hex/base64 encoding if desired
+        if self.encoding:
+            value = value.encode(self.encoding)
+
+        # Convert to unicode using an 8-bit encoding to retain binary data
+        return value.decode('latin1')
+
+    def adapt(self, value):
+        """
+        If the input is unicode, decode it into bytes.  If it is already
+        bytes, it is returned unchanged.
+
+        If an encoding was specific for the field, it is applied here if the input
+        is `unicode`.
+
+        This assumes that the unicode only contains code points in the
+        valid ranges for a byte - e.g. 0-255.
+
+        :param value: Value to decode
+        :return: `bytes` object
+        """
+        if isinstance(value, unicode):
+            value = value.encode('latin1')
+            if self.encoding:
+                value = value.decode(self.encoding)
+
+        return super(BytesField, self).adapt(value)
 
 
 class SlugField(StringField):
@@ -479,6 +542,7 @@ _type_map = {
     int: IntField(),
     basestring: StringField(),
     unicode: StringField(),
+    bytes: BytesField(),
     str: StringField(),
     float: FloatField(),
     bool: BooleanField(),
