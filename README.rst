@@ -18,7 +18,21 @@ SpringField is ideal for:
 - Parsing CSV data structures from ``csv.DictReader``
 - Turning anything Python can parse into a ``dict`` or ``list`` into a structured object
 
+
 Similar Projects
 ----------------
 
 * `schematics (formerly dictshield) <https://github.com/j2labs/schematics>`_
+
+
+Running Tests
+-------------
+
+To run tests, first install the test requirements:
+
+    pip install -r test_requirements.txt
+
+
+Tests can be run with ./src/tests/runtests.py:
+
+    python src/tests/runtests.py
