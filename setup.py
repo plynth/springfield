@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='springfield',
-    packages=['springfield'],
+    packages=['springfield', 'pytest_springfield'],
     package_dir={'':'src'},
     version=open('VERSION.txt').read().strip(),
     author='Mike Thornton',

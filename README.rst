@@ -164,6 +164,7 @@ Flask Example
 TODO
 
 
+
 Similar Projects
 ----------------
 
@@ -185,3 +186,17 @@ Now you can build requirements with ``make``:
 
 ..
     make html
+=======
+
+
+Running Tests
+-------------
+
+To run tests, first install the test requirements:
+
+    pip install -r test_requirements.txt
+
+
+Tests can be run with ./src/tests/runtests.py:
+
+    python src/tests/runtests.py
