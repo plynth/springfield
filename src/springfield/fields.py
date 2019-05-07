@@ -1,13 +1,20 @@
+from future.utils import raise_, raise_from
+from builtins import bytes, str, int
+from past.builtins import basestring
+from builtins import object
+from codecs import decode, encode
 from datetime import datetime
 import unicodedata
 
-import sys
 from anticipate.adapt import adapt, AdaptError
 from springfield.timeutil import date_parse, generate_rfc3339
 from springfield.types import Empty
 from decimal import Decimal
+import binascii
 import re
-import urlparse
+import sys
+import urllib.parse
+
 
 class FieldDescriptor(object):
     """
@@ -42,6 +49,7 @@ class FieldDescriptor(object):
         new_value = self.field.set(instance, self.name, value)
         if new_value != old_value:
             instance.__changes__.add(self.name)
+
 
 class Field(object):
     """
@@ -120,6 +128,7 @@ class Field(object):
         """
         return value
 
+
 class AdaptableTypeField(Field):
     """
     A :class:`Field` that has a specific type and can be adapted
@@ -144,7 +153,7 @@ class AdaptableTypeField(Field):
             # Use an object's own adapter to adapt.
             try:
                 return value.__adapt__(self.type)
-            except TypeError as e:
+            except TypeError:
                 pass
 
         if hasattr(self.type, '__adapt__'):
@@ -165,7 +174,6 @@ class AdaptableTypeField(Field):
 
         raise TypeError('Could not adapt %r to %r' % (value, self.type))
 
-
     @classmethod
     def register_adapter(cls, from_cls, func):
         """
@@ -179,11 +187,13 @@ class AdaptableTypeField(Field):
 
         cls.__adapters__[from_cls] = func
 
+
 class IntField(AdaptableTypeField):
     """
     A :class:`Field` that contains an `int`.
     """
     type = int
+
     def adapt(self, value):
         """
         Adapt `value` to an `int`.
@@ -199,18 +209,20 @@ class IntField(AdaptableTypeField):
         except TypeError:
             if isinstance(value, basestring):
                 return int(value)
-            elif isinstance(value, (float, long)):
+            elif isinstance(value, (float, int)):
                 t = int(value)
                 if t == value:
                     return t
 
             raise
 
+
 class FloatField(AdaptableTypeField):
     """
     A :class:`Field` that contains a `float`.
     """
     type = float
+
     def adapt(self, value):
         """
         Adapt `value` to a `float`.
@@ -225,12 +237,13 @@ class FloatField(AdaptableTypeField):
         except TypeError:
             if isinstance(value, (basestring, int)):
                 return float(value)
-            elif isinstance(value, (float, long)):
+            elif isinstance(value, (float, int)):
                 return value
             elif isinstance(value, Decimal):
                 return float(value)
 
             raise
+
 
 class BooleanField(AdaptableTypeField):
     """
@@ -238,6 +251,7 @@ class BooleanField(AdaptableTypeField):
     """
 
     type = bool
+
     def adapt(self, value):
         """
         Adapt `value` to a `bool`.
@@ -263,7 +277,7 @@ class BooleanField(AdaptableTypeField):
                     return True
                 elif str in ['no', 'false', '0', 'off']:
                     return False
-            elif isinstance(value, (float, long, int)):
+            elif isinstance(value, (float, int)):
                 if value == 1:
                     return True
                 elif value == 0:
@@ -271,12 +285,13 @@ class BooleanField(AdaptableTypeField):
 
             raise
 
+
 class StringField(AdaptableTypeField):
     """
     A :class:`Field` that contains a unicode string.
     """
 
-    type = unicode
+    type = str
 
     def adapt(self, value):
         """
@@ -286,7 +301,7 @@ class StringField(AdaptableTypeField):
             return super(StringField, self).adapt(value)
         except TypeError:
             if isinstance(value, basestring):
-                return unicode(value)
+                return str(value)
             raise
 
 
@@ -333,10 +348,10 @@ class BytesField(AdaptableTypeField):
 
         # Apply hex/base64 encoding if desired
         if self.encoding:
-            value = value.encode(self.encoding)
+            value = encode(value, self.encoding)
 
         # Convert to unicode using an 8-bit encoding to retain binary data
-        return value.decode('latin1')
+        return decode(value, 'latin1')
 
     def adapt(self, value):
         """
@@ -352,10 +367,13 @@ class BytesField(AdaptableTypeField):
         :param value: Value to decode
         :return: `bytes` object
         """
-        if isinstance(value, unicode):
-            value = value.encode('latin1')
-            if self.encoding:
-                value = value.decode(self.encoding)
+        if isinstance(value, str):
+            try:
+                value = encode(value, 'latin1')
+                if self.encoding:
+                    value = decode(value, self.encoding)
+            except binascii.Error as e:
+                raise_from(TypeError, e)
 
         return super(BytesField, self).adapt(value)
 
@@ -380,11 +398,14 @@ class SlugField(StringField):
         if not value:
             return ''
 
-        slug = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore')
+        # re-encoding to ASCII makes it bytes, and we need unicode,
+        # so we immediately decode
+        slug = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
         slug = re.sub(r'[^\w\s-]', '', slug).strip().lower()
         slug = re.sub(r'[-\s]+', '-', slug).strip('-')
 
         return slug
+
 
 class DateTimeField(AdaptableTypeField):
     """
@@ -416,10 +437,12 @@ class DateTimeField(AdaptableTypeField):
         if value is not None:
             return generate_rfc3339(value)
 
+
 class EmailField(StringField):
     """
     :class:`Field` with an email value
     """
+
 
 class UrlField(StringField):
     """
@@ -436,14 +459,15 @@ class UrlField(StringField):
         """
         value = super(UrlField, self).adapt(value)
         if value:
-            url_parts = urlparse.urlparse(value)
+            url_parts = urllib.parse.urlparse(value)
             if url_parts.scheme and url_parts.netloc:
                 new_url_parts = list(url_parts)
                 new_url_parts[0] = url_parts.scheme.lower()
                 new_url_parts[1] = url_parts.netloc.lower()
-                return urlparse.urlunparse(new_url_parts)
+                return urllib.parse.urlunparse(new_url_parts)
 
             raise TypeError('URL: %s is not a valid URL format' % value)
+
 
 class EntityField(AdaptableTypeField):
     """
@@ -473,8 +497,8 @@ class EntityField(AdaptableTypeField):
                 return _kls
             elif 'self' != dotted_name:
                 raise ValueError('Invalid class name for EntityField: %s' % dotted_name)
-        except Exception as e:
-            raise (
+        except Exception:
+            raise_(
                 ValueError,
                 'Invalid class name for EntityField: %s' % dotted_name,
                 sys.exc_info()[2]
@@ -513,8 +537,7 @@ class EntityField(AdaptableTypeField):
                 EntityField.
 
         """
-
-        if isinstance(self._type, str):
+        if isinstance(self._type, (bytes, str)):
             if self._type not in self.__class__._dotted_name_types:
                 _kls = self._resolve_dotted_name(self._type)
                 self.__class__._dotted_name_types[self._type] = _kls
@@ -541,12 +564,14 @@ class EntityField(AdaptableTypeField):
         if value is not None:
             return value.jsonify()
 
+
 class IdField(Field):
     """
     A :class:`Field` that is used as the primary identifier for an :class:`Entity`
 
     TODO This should accept another Field type to contain the ID
     """
+
 
 class CollectionField(Field):
     """
@@ -606,13 +631,13 @@ class CollectionField(Field):
 _type_map = {
     datetime: DateTimeField(),
     int: IntField(),
-    basestring: StringField(),
-    unicode: StringField(),
+    str: StringField(),
     bytes: BytesField(),
     str: StringField(),
     float: FloatField(),
     bool: BooleanField(),
 }
+
 
 def get_field_for_type(obj):
     t = type(obj)

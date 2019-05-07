@@ -1,3 +1,4 @@
+from codecs import decode, encode
 from springfield import fields, Entity
 import pytest
 
@@ -26,7 +27,7 @@ def test_float():
     for input, expect in [
         (1.1, 1.1),
         (11, 11.0),
-        (long(5.7), 5L)
+        (int(5.7), 5)
     ]:
         assert floatify(input) == expect
 
@@ -70,15 +71,15 @@ def test_bytes():
     base64_bytes_field = fields.BytesField()  # base64 is the default
 
     # Basic check of adapt and jsonify on just bytes
-    for input in ('abc', '\x00\xA0\xFF'):
+    for input in (b'abc', b'\x00\xA0\xFF'):
         for f in (escaping_bytes_field, hex_bytes_field, base64_bytes_field):
             # Adapt should reverse jsonify
             assert f.adapt(f.jsonify(input)) == input
             # Since its already bytes, adapt is a no-op
             assert f.adapt(input) == input
-        assert escaping_bytes_field.jsonify(input) == input.decode('latin1')
-        assert hex_bytes_field.jsonify(input) == unicode(input.encode('hex'))
-        assert base64_bytes_field.jsonify(input) == unicode(input.encode('base64'))
+        assert escaping_bytes_field.jsonify(input) == decode(input, 'latin1')
+        assert hex_bytes_field.jsonify(input) == decode(encode(input, 'hex'), 'latin1')
+        assert base64_bytes_field.jsonify(input) == decode(encode(input, 'base64'), 'latin1')
 
     # BytesField doesn't jsonify unicode values
     for input in (u'abc', u'\u0100', u'\u0000'):
@@ -93,7 +94,7 @@ def test_bytes():
 
     # Hex encoding doesn't accept non-hex inputs
     with pytest.raises(TypeError):
-        hex_bytes_field.adapt(u'hijklmnop')
+        hex_bytes_field.adapt(u'hijklmnopq')
 
     # Should leave null alone
     for f in (escaping_bytes_field, hex_bytes_field, base64_bytes_field):

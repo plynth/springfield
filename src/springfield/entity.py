@@ -1,10 +1,15 @@
+from builtins import str
+from past.builtins import basestring
+from builtins import object
 import json
 import inspect
-from springfield.fields import Field, Empty, get_field_for_type
+from springfield.fields import Field, Empty
 from springfield.alias import Alias
 from springfield import fields
-from anticipate.adapt import adapt, register_adapter, AdaptError
+from anticipate.adapt import adapt, AdaptError
 from anticipate import adapter
+from future.utils import with_metaclass
+
 
 class EntityBase(object):
     """
@@ -16,6 +21,7 @@ class EntityBase(object):
     against Entity since it doesn't exist yet.
     """
 
+
 class EntityMetaClass(type):
     def __new__(mcs, name, bases, attrs):
         _fields = {}
@@ -26,7 +32,7 @@ class EntityMetaClass(type):
             if hasattr(base, '__aliases__'):
                 _fields.update(base.__aliases__)
 
-        for key, val in attrs.items():
+        for key, val in list(attrs.items()):
             is_cls = inspect.isclass(val)
 
             if isinstance(val, Field):
@@ -37,13 +43,13 @@ class EntityMetaClass(type):
                 attrs.pop(key)
             elif is_cls and issubclass(val, Field):
                 _fields[key] = val()
-                attrs.pop(key)                
+                attrs.pop(key)
             elif isinstance(val, EntityBase) or (is_cls and issubclass(val, EntityBase)):
                 # Wrap fields assigned to `Entity`s with an `EntityField`
                 _fields[key] = fields.EntityField(val)
                 attrs.pop(key)
-            elif isinstance(val, list) and len(val) == 1:      
-                attr = val[0]       
+            elif isinstance(val, list) and len(val) == 1:
+                attr = val[0]
                 is_cls = inspect.isclass(attr)
                 if isinstance(attr, EntityBase) or (is_cls and issubclass(attr, EntityBase)):
                     # Lists that contain just an Entity class are treated as
@@ -54,10 +60,10 @@ class EntityMetaClass(type):
                     # a collection of that Field
                     _fields[key] = fields.CollectionField(attr)
 
-        for key, field in _fields.iteritems():
+        for key, field in _fields.items():
             attrs[key] = field.make_descriptor(key)
 
-        for key, field in aliases.iteritems():
+        for key, field in aliases.items():
             attrs[key] = field.make_descriptor(key)
 
         attrs['__fields__'] = _fields
@@ -73,8 +79,8 @@ class EntityMetaClass(type):
 
         return new_class
 
-class Entity(EntityBase):
-    __metaclass__ = EntityMetaClass
+
+class Entity(with_metaclass(EntityMetaClass, EntityBase)):
     __values__ = None
     __changes__ = None
     __fields__ = None
@@ -94,7 +100,7 @@ class Entity(EntityBase):
         Get the values as basic Python types
         """
         data = {}
-        for key, val in self.__values__.iteritems():
+        for key, val in self.__values__.items():
             val = self.__fields__[key].flatten(val)
             data[key] = val
 
@@ -105,7 +111,7 @@ class Entity(EntityBase):
         Return a dictionary suitable for JSON encoding.
         """
         data = {}
-        for key, val in self.__values__.iteritems():
+        for key, val in self.__values__.items():
             val = self.__fields__[key].jsonify(val)
             data[key] = val
         return data
@@ -166,7 +172,7 @@ class Entity(EntityBase):
         ancestory fields.
         """
         path = path or []
-        if '.' in target:            
+        if '.' in target:
             name, right = target.split('.', 1)
             soak = False
             if name.endswith('?'):
@@ -180,7 +186,7 @@ class Entity(EntityBase):
             if isinstance(field, fields.EntityField):
                 path.append((key, name, field, soak))
                 return self._get_field_path(field.type, right, path)
-            else:            
+            else:
                 raise KeyError('Expected EntityField for %s' % key)
         else:
             soak = False
@@ -206,7 +212,7 @@ class Entity(EntityBase):
     def __getitem__(self, name):
         try:
             if '.' in name:
-                pos = self        
+                pos = self
                 path = self._get_field_path(self, name)
                 last = path[-1]
                 path = path[:-1]
@@ -230,9 +236,9 @@ class Entity(EntityBase):
         raise KeyError(name)
 
     def __setitem__(self, name, value):
-        try:    
+        try:
             if '.' in name:
-                pos = self        
+                pos = self
                 path = self._get_field_path(self, name)
                 last = path[-1]
                 path = path[:-1]
@@ -245,7 +251,7 @@ class Entity(EntityBase):
                         pos = getattr(pos, field_name)
                     else:
                         raise ValueError('Expected Entity for %s' % field_key)
-                        
+
                 # This should be the end of our path, just set it
                 return setattr(pos, last[1], value)
 
@@ -267,7 +273,7 @@ class Entity(EntityBase):
         return len(self.__values__)
 
     def iteritems(self):
-        return self.__values__.iteritems()
+        return self.__values__.items()
 
     def items(self):
         return self.__values__.items()
@@ -287,7 +293,7 @@ class Entity(EntityBase):
         return (adapt(i, cls) for i in obj)
 
     def __repr__(self):
-        return u'<%s %s>' % (self.__class__.__name__, json.dumps(dict(((k, unicode(v)) for k, v in self.__values__.iteritems()))).replace('"', ''))
+        return u'<%s %s>' % (self.__class__.__name__, json.dumps(dict(((k, str(v)) for k, v in self.__values__.items()))).replace('"', ''))
 
     def __getstate__(self):
         """Pickle state"""
@@ -305,14 +311,19 @@ class Entity(EntityBase):
         return isinstance(other, self.__class__) and \
             self.__values__ == other.__values__
 
+    def __hash__(self):
+        return id(self)
+
     def __neq__(self, other):
         return not self.__eq__(other)
+
 
 class FlexEntity(Entity):
     """
     An Entity that can have extra attributes added to it.
     """
     __flex_fields__ = None
+
     def __init__(self, **values):
         object.__setattr__(self, '__flex_fields__', set([]))
 
@@ -330,7 +341,7 @@ class FlexEntity(Entity):
         return self.__values__.get(name, default)
 
     def update(self, values):
-        for key, val in values.iteritems():
+        for key, val in values.items():
             self.set(key, val)
 
     def _flatten_value(self, val):
@@ -350,10 +361,10 @@ class FlexEntity(Entity):
             val = vals
         elif isinstance(val, dict):
             data = {}
-            for k,v in val.iteritems():
+            for k,v in val.items():
                 data[k] = self._flatten_value(v)
             val = data
-        elif not isinstance(val, (basestring, int, float, long)):
+        elif not isinstance(val, (basestring, int, float)):
             val = str(val)
         return val
 
@@ -367,7 +378,7 @@ class FlexEntity(Entity):
             val = val.jsonify()
         elif isinstance(val, dict):
             data = {}
-            for k,v in val.iteritems():
+            for k,v in val.items():
                 data[k] = self._jsonify_value(v)
             val = data
         elif isinstance(val, (tuple, list)) or inspect.isgenerator(val):
@@ -387,7 +398,7 @@ class FlexEntity(Entity):
         Get the values as basic Python types
         """
         data = {}
-        for key, val in self.__values__.iteritems():
+        for key, val in self.__values__.items():
             if key in self.__fields__:
                 val = self.__fields__[key].flatten(val)
             else:
@@ -402,7 +413,7 @@ class FlexEntity(Entity):
         Get the values as basic Python types
         """
         data = {}
-        for key, val in self.__values__.iteritems():
+        for key, val in self.__values__.items():
             if key in self.__fields__:
                 val = self.__fields__[key].jsonify(val)
             else:

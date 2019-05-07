@@ -10,7 +10,7 @@ class EmptyType(type):
         return ""
     def __repr__(self):
         return "Empty"
-    def __nonzero__(self):
+    def __bool__(self):
         return False
     def __len__(self):
         return 0
