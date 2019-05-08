@@ -1,10 +1,13 @@
 from datetime import datetime
 import unicodedata
+
+import sys
 from anticipate.adapt import adapt, AdaptError
 from springfield.timeutil import date_parse, generate_rfc3339
 from springfield.types import Empty
 from decimal import Decimal
 import re
+import urlparse
 
 class FieldDescriptor(object):
     """
@@ -274,6 +277,7 @@ class StringField(AdaptableTypeField):
     """
 
     type = unicode
+
     def adapt(self, value):
         """
         Adapt `value` to `unicode`.
@@ -284,6 +288,77 @@ class StringField(AdaptableTypeField):
             if isinstance(value, basestring):
                 return unicode(value)
             raise
+
+
+class BytesField(AdaptableTypeField):
+    """
+    A :class:`Field` that contains binary `bytes`.
+
+    The field has an encoding to use for json/unicode conversion, such
+    as `'base64'` (the default) or `'hex'`.
+
+    If `encoding == None`, no encoding/decoding is performed for JSON/unicode
+    values which mean JSON itself will have to escape the bytes using unicode
+    escapes where necessary.  This is most suitable for cases where the "bytes"
+    are known to be ASCII 7-bit safe.
+
+    The encoding is used in `adapt` if the input is a `unicode` instance, and
+    in `jsonify` always.
+    """
+
+    type = bytes
+    encoding = 'base64'
+
+    def __init__(self, encoding='base64', *args, **kwargs):
+        """
+        Construct a Bytes field
+
+        :param encoding: Optional encoding to use for jsonify(), such as
+           'hex' or 'base64'
+        """
+        super(BytesField, self).__init__(*args, **kwargs)
+        self.encoding = encoding
+
+    def jsonify(self, value):
+        """
+        Encode the bytes into a unicode string suitable for json encoding.
+
+        If an encoding was specified for the field, it is applied here.
+        """
+        if value is None:
+            return None
+
+        if not isinstance(value, bytes):
+            raise ValueError('BytesField must contain bytes')
+
+        # Apply hex/base64 encoding if desired
+        if self.encoding:
+            value = value.encode(self.encoding)
+
+        # Convert to unicode using an 8-bit encoding to retain binary data
+        return value.decode('latin1')
+
+    def adapt(self, value):
+        """
+        If the input is unicode, decode it into bytes.  If it is already
+        bytes, it is returned unchanged.
+
+        If an encoding was specific for the field, it is applied here if the input
+        is `unicode`.
+
+        This assumes that the unicode only contains code points in the
+        valid ranges for a byte - e.g. 0-255.
+
+        :param value: Value to decode
+        :return: `bytes` object
+        """
+        if isinstance(value, unicode):
+            value = value.encode('latin1')
+            if self.encoding:
+                value = value.decode(self.encoding)
+
+        return super(BytesField, self).adapt(value)
+
 
 class SlugField(StringField):
     """
@@ -350,23 +425,106 @@ class UrlField(StringField):
     """
     :class:`Field` with a URL value
     """
+    def adapt(self, value):
+        """
+        Validate that the `value` has a valid URL format containing
+        a scheme and network location using urlparse.
+
+        :param value: A url-like value.
+
+        :returns: URL with sheme and network location in lower case.
+        """
+        value = super(UrlField, self).adapt(value)
+        if value:
+            url_parts = urlparse.urlparse(value)
+            if url_parts.scheme and url_parts.netloc:
+                new_url_parts = list(url_parts)
+                new_url_parts[0] = url_parts.scheme.lower()
+                new_url_parts[1] = url_parts.netloc.lower()
+                return urlparse.urlunparse(new_url_parts)
+
+            raise TypeError('URL: %s is not a valid URL format' % value)
 
 class EntityField(AdaptableTypeField):
     """
     :class:`Field` that can contain an :class:`Entity`
     """
+
+    # A map storing resolved dotted-name class types
+    _dotted_name_types = {}
+
     def __init__(self, entity, *args, **kwargs):
         """
         :param entity: The :class:`Entity` class to expect for this field.
                        Use 'self' to use the :class:`Entity` class that
                        this field is already bound to.
         """
-        self.type = entity
+        self._type = entity
         super(EntityField, self).__init__(*args, **kwargs)
 
+    @staticmethod
+    def _resolve_dotted_name(dotted_name):
+        try:
+            if '.' in dotted_name:
+                modules, _kls_name = dotted_name.rsplit('.', 1)
+                _module = __import__(modules, fromlist=[_kls_name])
+                _kls = getattr(_module, _kls_name)
+                assert callable(_kls), 'Dotted-name entity types should be callable.'
+                return _kls
+            elif 'self' != dotted_name:
+                raise ValueError('Invalid class name for EntityField: %s' % dotted_name)
+        except Exception as e:
+            raise (
+                ValueError,
+                'Invalid class name for EntityField: %s' % dotted_name,
+                sys.exc_info()[2]
+            )
+
+    @property
+    def type(self):
+        """
+        Determine the type of the Entity that will be instantiated.
+
+        There are three ways to reference an Entity when using an EntityField:
+
+        - 'self': A byte string referencing the class that is defining this
+            EntityField as an attribute.
+        - '{dotted.name.kls}': A byte string referencing an importable callable
+            that can be instantiated at field-instantiation time.
+        - {Entity}: A type that subclasses `Entity`.
+
+        The order of operations during instantiation and resolution of the
+        above references is important; During the creation of an `Entity`, the
+        metaclass will call `init()` for fields defined on the class. This
+        is useful for the 'self' reference so that the `EntityField` can
+        be initialized with the class that is being instantiated during
+        creation of the instance. For dotted-name class strings, this is too
+        early since the dotted-name reference may not exist yet. For this
+        reason, resolving the dotted-name reference is deferred to be as late
+        as possible, in this case on the first read of the `type` property of
+        this field.
+
+        The dotted-name references are stored in a map on the `EntityField`
+        class to prevent resolving and importing the dotted-name on every
+        instance of this `EntityField`.
+
+        Returns:
+            `type`: A type to use when instantiating the Entity for this
+                EntityField.
+
+        """
+
+        if isinstance(self._type, str):
+            if self._type not in self.__class__._dotted_name_types:
+                _kls = self._resolve_dotted_name(self._type)
+                self.__class__._dotted_name_types[self._type] = _kls
+            return self.__class__._dotted_name_types[self._type]
+
+        return self._type
+
     def init(self, cls):
-        if self.type == 'self':
-            self.type = cls
+        if self._type == 'self':
+            self._type = cls
 
     def flatten(self, value):
         """
@@ -450,6 +608,7 @@ _type_map = {
     int: IntField(),
     basestring: StringField(),
     unicode: StringField(),
+    bytes: BytesField(),
     str: StringField(),
     float: FloatField(),
     bool: BooleanField(),

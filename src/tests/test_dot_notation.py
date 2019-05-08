@@ -10,13 +10,13 @@ class ChildEntity(Entity):
     slug = fields.StringField()
     pos = PositionEntity
 
-class TestEntity(Entity):
+class ExampleTestEntity(Entity):
     id = fields.IntField()
     name = fields.StringField()
     child = ChildEntity
 
 def test_dot_notation():
-    e = TestEntity()
+    e = ExampleTestEntity()
 
     assert e['child'] is None
     assert e['child'] is e.child
@@ -70,7 +70,7 @@ def test_dot_notation():
     assert e.child.pos.top == 14
 
     # Test creating a new Entity
-    e2 = TestEntity(**{
+    e2 = ExampleTestEntity(**{
         'child.pos': {'top': 12, 'left': 67},
     })
 
