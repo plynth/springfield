@@ -1,3 +1,4 @@
+from builtins import object
 from springfield.fields import EntityField
 
 class AliasDescriptor(object):

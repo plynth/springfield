@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
+from builtins import map
 from datetime import timedelta, tzinfo, datetime
 import re
 
 try:
     # Try to use pytz if it exists
     from pytz import utc
-except ImportError:    
+except ImportError:
     # Fallback to simple UTC implementation
 
     class _UtcOffset(tzinfo):
@@ -65,10 +66,10 @@ except ImportError:
         Input is always converted to UTC.
 
         :param value: A :class:`datetime` instance
-        """        
+        """
         if value.tzinfo is None:
             value = value.replace(tzinfo=utc)
-            
+
         value = value.astimezone(utc)
 
         return value.strftime('%Y-%m-%dT%H:%M:%S') + 'Z'

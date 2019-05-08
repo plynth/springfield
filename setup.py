@@ -1,9 +1,9 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
     name='springfield',
     packages=['springfield', 'pytest_springfield'],
-    package_dir={'':'src'},
+    package_dir={'': 'src'},
     version=open('VERSION.txt').read().strip(),
     author='Mike Thornton',
     author_email='six8@devdetails.com',
@@ -27,7 +27,8 @@ setup(
     ],
     long_description=open('README.rst').read(),
     install_requires=[
-        'anticipate',
+        'anticipate>=0.9.1',
+        'future==0.17.1',
     ],
     entry_points={
         'pytest11': [
