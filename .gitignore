@@ -7,4 +7,5 @@
 docs/_build
 MANIFEST
 dist
+build
 __pycache__
