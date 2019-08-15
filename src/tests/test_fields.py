@@ -1,4 +1,6 @@
 from codecs import decode, encode
+from past.builtins import unicode
+from builtins import str
 from springfield import fields, Entity
 import pytest
 
@@ -204,3 +206,11 @@ def test_dotted_named_entities_not_dotted():
     assert result.name == 'outer'
     assert result.foo.name == 'inner'
     assert result.foo.foo.name == 'deeper'
+
+def test_stringfield_return_unicode():
+    """
+    Assure that stringfield return type should be unicode
+    """
+    stringify = fields.StringField().adapt
+
+    assert isinstance(stringify("Hello World"),unicode)
