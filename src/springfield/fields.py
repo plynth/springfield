@@ -1,6 +1,6 @@
 from future.utils import raise_, raise_from
 from builtins import bytes, str, int
-from past.builtins import basestring
+from past.builtins import basestring, unicode
 from builtins import object
 from codecs import decode, encode
 from datetime import datetime
@@ -290,8 +290,7 @@ class StringField(AdaptableTypeField):
     """
     A :class:`Field` that contains a unicode string.
     """
-
-    type = str
+    type = unicode
 
     def adapt(self, value):
         """
@@ -301,7 +300,7 @@ class StringField(AdaptableTypeField):
             return super(StringField, self).adapt(value)
         except TypeError:
             if isinstance(value, basestring):
-                return str(value)
+                return unicode(value)
             raise
 
 
