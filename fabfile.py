@@ -20,7 +20,7 @@ def release():
     existing_tag = local(clom.git.tag('-l', version), capture=True)
     if not existing_tag.strip():
         print('Releasing %s...' % version)
-        local(clom.git.tag(version))        
+        local(clom.git.tag(version))
 
     if confirm('Push %s to pypi?' % version, default=True):
         local(clom.git.push('origin', 'HEAD'))

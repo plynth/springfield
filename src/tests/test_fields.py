@@ -1,8 +1,7 @@
-from codecs import decode, encode
-from past.builtins import unicode
-from builtins import str
-from springfield import fields, Entity
 import pytest
+from codecs import decode, encode
+from six import text_type
+from springfield import fields, Entity
 
 
 def test_slug():
@@ -186,7 +185,6 @@ def test_dotted_named_entities_not_dotted():
     with pytest.raises(ValueError):
         ExistingNonDottedNameEntity(foo={})
 
-
     class SelfNonDottedNameEntity(Entity):
         # 'self' is a special case and is the only non-dotted,
         # dotted-name class reference that we support.
@@ -207,10 +205,10 @@ def test_dotted_named_entities_not_dotted():
     assert result.foo.name == 'inner'
     assert result.foo.foo.name == 'deeper'
 
-def test_stringfield_return_unicode():
+
+def test_stringfield_return_text_type():
     """
-    Assure that stringfield return type should be unicode
+    Assure that stringfield return type should be text_type
     """
     stringify = fields.StringField().adapt
-
-    assert isinstance(stringify("Hello World"),unicode)
+    assert isinstance(stringify("Hello World"), text_type)
