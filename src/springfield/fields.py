@@ -1,19 +1,19 @@
-from future.utils import raise_, raise_from
-from builtins import bytes, str, int
-from past.builtins import basestring, unicode
-from builtins import object
-from codecs import decode, encode
-from datetime import datetime
-import unicodedata
-
-from anticipate.adapt import adapt, AdaptError
-from springfield.timeutil import date_parse, generate_rfc3339
-from springfield.types import Empty
-from decimal import Decimal
 import binascii
 import re
 import sys
-import urllib.parse
+import unicodedata
+
+from codecs import decode, encode
+from datetime import datetime
+
+from anticipate.adapt import adapt, AdaptError
+from six import integer_types, raise_from, string_types, text_type
+from six import reraise as raise_
+from six.moves.urllib.parse import urlparse, urlunparse
+
+from springfield.timeutil import date_parse, generate_rfc3339
+from springfield.types import Empty
+from decimal import Decimal
 
 
 class FieldDescriptor(object):
@@ -207,9 +207,9 @@ class IntField(AdaptableTypeField):
         try:
             return super(IntField, self).adapt(value)
         except TypeError:
-            if isinstance(value, basestring):
+            if isinstance(value, string_types):
                 return int(value)
-            elif isinstance(value, (float, int)):
+            elif isinstance(value, (float,) + integer_types):
                 t = int(value)
                 if t == value:
                     return t
@@ -235,9 +235,9 @@ class FloatField(AdaptableTypeField):
         try:
             return super(FloatField, self).adapt(value)
         except TypeError:
-            if isinstance(value, (basestring, int)):
+            if isinstance(value, (int,) + string_types):
                 return float(value)
-            elif isinstance(value, (float, int)):
+            elif isinstance(value, (float,) + integer_types):
                 return value
             elif isinstance(value, Decimal):
                 return float(value)
@@ -249,7 +249,6 @@ class BooleanField(AdaptableTypeField):
     """
     A :class:`Field` that contains a `bool`.
     """
-
     type = bool
 
     def adapt(self, value):
@@ -271,13 +270,13 @@ class BooleanField(AdaptableTypeField):
         try:
             return super(BooleanField, self).adapt(value)
         except TypeError:
-            if isinstance(value, basestring):
+            if isinstance(value, string_types):
                 str = value.lower()
                 if str in ['yes', 'true', '1', 'on']:
                     return True
                 elif str in ['no', 'false', '0', 'off']:
                     return False
-            elif isinstance(value, (float, int)):
+            elif isinstance(value, (float,) + integer_types):
                 if value == 1:
                     return True
                 elif value == 0:
@@ -290,7 +289,7 @@ class StringField(AdaptableTypeField):
     """
     A :class:`Field` that contains a unicode string.
     """
-    type = unicode
+    type = text_type
 
     def adapt(self, value):
         """
@@ -299,8 +298,8 @@ class StringField(AdaptableTypeField):
         try:
             return super(StringField, self).adapt(value)
         except TypeError:
-            if isinstance(value, basestring):
-                return unicode(value)
+            if isinstance(value, string_types):
+                return text_type(value)
             raise
 
 
@@ -366,7 +365,7 @@ class BytesField(AdaptableTypeField):
         :param value: Value to decode
         :return: `bytes` object
         """
-        if isinstance(value, str):
+        if isinstance(value, text_type):
             try:
                 value = encode(value, 'latin1')
                 if self.encoding:
@@ -425,7 +424,7 @@ class DateTimeField(AdaptableTypeField):
         try:
             return super(DateTimeField, self).adapt(value)
         except TypeError:
-            if isinstance(value, basestring):
+            if isinstance(value, string_types):
                 return date_parse(value)
             raise
 
@@ -458,12 +457,12 @@ class UrlField(StringField):
         """
         value = super(UrlField, self).adapt(value)
         if value:
-            url_parts = urllib.parse.urlparse(value)
+            url_parts = urlparse(value)
             if url_parts.scheme and url_parts.netloc:
                 new_url_parts = list(url_parts)
                 new_url_parts[0] = url_parts.scheme.lower()
                 new_url_parts[1] = url_parts.netloc.lower()
-                return urllib.parse.urlunparse(new_url_parts)
+                return urlunparse(new_url_parts)
 
             raise TypeError('URL: %s is not a valid URL format' % value)
 
@@ -499,7 +498,7 @@ class EntityField(AdaptableTypeField):
         except Exception:
             raise_(
                 ValueError,
-                'Invalid class name for EntityField: %s' % dotted_name,
+                ValueError('Invalid class name for EntityField: %s' % dotted_name),
                 sys.exc_info()[2]
             )
 
@@ -536,7 +535,7 @@ class EntityField(AdaptableTypeField):
                 EntityField.
 
         """
-        if isinstance(self._type, (bytes, str)):
+        if isinstance(self._type, (bytes, text_type)):
             if self._type not in self.__class__._dotted_name_types:
                 _kls = self._resolve_dotted_name(self._type)
                 self.__class__._dotted_name_types[self._type] = _kls
@@ -630,9 +629,9 @@ class CollectionField(Field):
 _type_map = {
     datetime: DateTimeField(),
     int: IntField(),
-    str: StringField(),
     bytes: BytesField(),
     str: StringField(),
+    text_type: StringField(),
     float: FloatField(),
     bool: BooleanField(),
 }

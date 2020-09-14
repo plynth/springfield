@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 
-from builtins import map
 from datetime import timedelta, tzinfo, datetime
 import re
+
+try:
+    import itertools.imap as map
+except ImportError:
+    pass
 
 try:
     # Try to use pytz if it exists

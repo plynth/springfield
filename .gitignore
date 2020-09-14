@@ -1,5 +1,6 @@
 .DS_Store
 .python-version
+.cache/
 *.pyc
 *.pyo
 *.egg-info

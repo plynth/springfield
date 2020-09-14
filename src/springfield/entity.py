@@ -1,14 +1,11 @@
-from builtins import str
-from past.builtins import basestring
-from builtins import object
 import json
 import inspect
+from six import integer_types, string_types, text_type, with_metaclass
 from springfield.fields import Field, Empty
 from springfield.alias import Alias
 from springfield import fields
 from anticipate.adapt import adapt, AdaptError
 from anticipate import adapter
-from future.utils import with_metaclass
 
 
 class EntityBase(object):
@@ -293,7 +290,7 @@ class Entity(with_metaclass(EntityMetaClass, EntityBase)):
         return (adapt(i, cls) for i in obj)
 
     def __repr__(self):
-        return u'<%s %s>' % (self.__class__.__name__, json.dumps(dict(((k, str(v)) for k, v in self.__values__.items()))).replace('"', ''))
+        return u'<%s %s>' % (self.__class__.__name__, json.dumps(dict(((k, text_type(v)) for k, v in self.__values__.items()))).replace('"', ''))
 
     def __getstate__(self):
         """Pickle state"""
@@ -361,13 +358,12 @@ class FlexEntity(Entity):
             val = vals
         elif isinstance(val, dict):
             data = {}
-            for k,v in val.items():
+            for k, v in val.items():
                 data[k] = self._flatten_value(v)
             val = data
-        elif not isinstance(val, (basestring, int, float)):
-            val = str(val)
+        elif not isinstance(val, (float,) + integer_types + string_types):
+            val = text_type(val)
         return val
-
 
     def _jsonify_value(self, val):
         if val is None:
@@ -378,7 +374,7 @@ class FlexEntity(Entity):
             val = val.jsonify()
         elif isinstance(val, dict):
             data = {}
-            for k,v in val.items():
+            for k, v in val.items():
                 data[k] = self._jsonify_value(v)
             val = data
         elif isinstance(val, (tuple, list)) or inspect.isgenerator(val):

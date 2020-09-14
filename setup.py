@@ -12,7 +12,6 @@ if sys.argv[-1] in ('build', 'publish'):
     sys.exit()
 
 
-
 setup(
     name='springfield',
     packages=['springfield', 'pytest_springfield'],
@@ -34,7 +33,7 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',            
+        'Programming Language :: Python :: 3.7',
         'Operating System :: OS Independent',
         'License :: OSI Approved :: BSD License',
     ],
@@ -42,7 +41,7 @@ setup(
     long_description_content_type='text/x-rst',
     install_requires=[
         'anticipate>=0.9.1',
-        'future==0.17.1',
+        'six>=1.9.0',
     ],
     entry_points={
         'pytest11': [
