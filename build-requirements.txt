@@ -1,4 +1,4 @@
 twine
 setuptools
 wheel
-rst_include
+rst-include

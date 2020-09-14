@@ -2,6 +2,12 @@
 Changelog
 ---------
 
+0.9.0
+=====
+
+* Switched from `future` to `six` Python 2/3 compatibility libraries because `future`'s 
+  modified `str` does not play well with adapters.
+
 0.8.0
 =====
 
