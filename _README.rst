@@ -158,33 +158,4 @@ Similar Projects
 * `attrs <https://github.com/hynek/attrs>`_
 
 
-Building Documentation
-----------------------
-
-To build documentation, first install the requirements:
-
-..
-    cd docs/
-    pip install -r requirements.txt
-
-
-Now you can build requirements with ``make``:
-
-..
-    make html
-
-
-Running Tests
--------------
-
-To run tests, first install the test requirements:
-
-    pip install -r test_requirements.txt
-
-
-Tests can be run with ./src/tests/runtests.py:
-
-    python src/tests/runtests.py
-
-
 .. include:: CHANGELOG.rst    

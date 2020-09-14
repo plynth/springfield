@@ -4,8 +4,8 @@ from setuptools import setup
 
 if sys.argv[-1] in ('build', 'publish'):
     check_call(
-        'rst_include include -s ./_README.rst -t ./README.rst', shell=True)
-    check_call('python setup.py sdist bdist_wheel', shell=True)
+        'rst_include include ./_README.rst ./README.rst', shell=True)
+    check_call('python setup.py sdist bdist_wheel --universal', shell=True)
     if sys.argv[-1] == 'publish':
         check_call('twine check dist/*', shell=True)
         check_call('twine upload dist/*', shell=True)

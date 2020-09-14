@@ -157,38 +157,15 @@ Similar Projects
 * `schematics (formerly dictshield) <https://github.com/j2labs/schematics>`_
 * `attrs <https://github.com/hynek/attrs>`_
 
-
-Building Documentation
-----------------------
-
-To build documentation, first install the requirements:
-
-..
-    cd docs/
-    pip install -r requirements.txt
-
-
-Now you can build requirements with ``make``:
-
-..
-    make html
-
-
-Running Tests
--------------
-
-To run tests, first install the test requirements:
-
-    pip install -r test_requirements.txt
-
-
-Tests can be run with ./src/tests/runtests.py:
-
-    python src/tests/runtests.py
-
 ---------
 Changelog
 ---------
+
+0.9.0
+=====
+
+* Switched from `future` to `six` Python 2/3 compatibility libraries because `future`'s
+  modified `str` does not play well with adapters.
 
 0.8.0
 =====
