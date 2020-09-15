@@ -132,7 +132,7 @@ class Entity(with_metaclass(EntityMetaClass, EntityBase)):
 
         :param empty: boolean - Include empty values
         """
-        if isinstance(key, basestring):
+        if isinstance(key, string_types):
             return getattr(self, key, default)
         else:
             d = {}
