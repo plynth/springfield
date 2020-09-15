@@ -161,6 +161,11 @@ Similar Projects
 Changelog
 ---------
 
+0.9.1
+=====
+
+* Fixed `Entity.get()` for Python 3
+
 0.9.0
 =====
 
@@ -186,9 +191,6 @@ Changelog
 
 0.7.15
 ======
-
-Bug Fixes
----------
 
 * Allow empty values for URL
 
