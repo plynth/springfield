@@ -1,6 +1,7 @@
 from springfield import Entity, FlexEntity, fields
 import pytest
 
+
 def test_entity():
     class TestEntity(Entity):
         id = fields.IntField()
@@ -14,16 +15,21 @@ def test_entity():
     assert e.name == 'foo'
     assert e.bool is True
 
+    assert e.get('id') == 1
+    assert e.get('name') == 'foo'
+    assert e.get('bool') is True
+    assert e.get(('id', 'name')) == {'id': 1, 'name': 'foo'}
 
     with pytest.raises(AttributeError):
         e.invalid_field
+
 
 def test_bool_field():
     class TestEntity(Entity):
         bool = fields.BooleanField()
 
     e = TestEntity()
-    
+
     for i in [True, 'yes', 'YES', 'on', 'true', '1', 1]:
         e.bool = i
         assert e.bool is True
@@ -35,10 +41,10 @@ def test_bool_field():
     e.bool = None
     assert e.bool is None
 
-
     for i in [22, object(), 2.4, 'frag']:
         with pytest.raises(TypeError):
             e.bool = i
+
 
 def test_flex_entity():
     class TestEntity(FlexEntity):
@@ -49,11 +55,12 @@ def test_flex_entity():
     assert e.name == 'test'
     assert e.nofield == 'foo'
 
+
 def test_entity_field():
-    class SubEntity(Entity):  
+    class SubEntity(Entity):
         id = fields.IntField()
 
-    class TestEntity(Entity):    
+    class TestEntity(Entity):
         sub = fields.EntityField(SubEntity)
 
     e = TestEntity(sub=dict(id='2'))
